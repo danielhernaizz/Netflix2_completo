@@ -1,0 +1,536 @@
+<!doctype html><html><head><meta charset="utf-8">
+    <title>My Favourite Movies</title>
+    <link href="https://fonts.googleapis.com/css?family=Roboto&display=swap" rel="stylesheet">
+    <style>
+        body { --primary: #6200ee; --primary-dark: #4a00b8; --danger: #c62828; --bg: #f5f3fa; margin: 0px; background: var(--bg); }
+        * {font-family: 'Roboto', sans-serif; box-sizing: border-box;}
+        button {
+            -webkit-font-smoothing: antialiased;
+            display: inline-block;
+            margin: 2px;
+            color: var(--primary);
+            background: white;
+            border: 1px solid var(--primary);
+            border-radius: 4px;
+            height: 30px;
+            font-size: 11px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: ease-in 0.2s all;
+            padding: 0 14px;
+        }
+        button:hover { background: var(--primary); color: white; }
+        button.delete { color: var(--danger); border-color: var(--danger); }
+        button.delete:hover { background: var(--danger); color: white; }
+        button.update, button.create, button.new { background: var(--primary); color: white; }
+        button.update:hover, button.create:hover, button.new:hover { background: var(--primary-dark); }
+
+        h1 { background: var(--primary); color: white; font-weight: 300; text-transform: uppercase; font-size: 22px; margin: 0px; padding: 18px 24px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,.25); }
+        h2 { margin: 0 0 16px 0; font-size: 22px; color: var(--primary); }
+        div#main { padding: 20px 24px; max-width: 1100px; margin: 0 auto; }
+
+        div.toolbar { margin-bottom: 18px; display: flex; gap: 6px; align-items: center; }
+        div.toolbar .count { margin-left: auto; color: #666; font-size: 13px; }
+        div.movies { display: flex; flex-wrap: wrap; gap: 18px; }
+        div.movie { width: 220px; padding: 10px; background: white; border-radius: 6px; box-shadow: 2px 2px 8px #ccc; transition: transform .15s; }
+        div.movie:hover { transform: translateY(-3px); }
+        div.movie div.movie-img { width: 100%; height: 300px; overflow: hidden; border-radius: 4px; background: #eee; cursor: pointer; }
+        div.movie div.movie-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        div.movie div.title { text-align: center; overflow: hidden; text-overflow: ellipsis; width: 100%; white-space: nowrap; margin-top: 8px; font-size: 17px; }
+        div.movie div.actions { margin-top: 8px; text-align: center; white-space: nowrap; }
+        div.movie div.actions button { padding: 0 8px; margin: 2px 1px; }
+        div.empty { padding: 40px; text-align: center; color: #666; background: white; border-radius: 6px; }
+
+        div.card { background: white; border-radius: 6px; box-shadow: 2px 2px 8px #ccc; padding: 24px; max-width: 760px; }
+        div.detail { display: flex; gap: 24px; flex-wrap: wrap; }
+        div.detail img { width: 240px; height: 340px; object-fit: cover; border-radius: 4px; box-shadow: 2px 2px 8px #ccc; }
+        div.detail div.info { flex: 1; min-width: 220px; }
+        div.detail p { margin: 0 0 14px 0; font-size: 18px; }
+        div.field { color: var(--primary); text-transform: uppercase; font-size: 12px; margin-bottom: 4px; }
+        div.form-row { margin-bottom: 14px; }
+        input { width: 100%; max-width: 420px; padding: 8px; font-size: 14px; border: 1px solid #aaa; border-radius: 4px; }
+        input:focus { outline: 2px solid var(--primary); border-color: transparent; }
+        p.hint { color: #666; font-size: 13px; margin: 0 0 16px 0; }
+        div.actions { margin-top: 14px; }
+
+        /* Part 2: TMDb search */
+        div.message { margin: 14px 0 0 0; padding: 0; font-size: 14px; }
+        div.message:empty { display: none; }
+        div.message.error   { padding: 10px 12px; border-radius: 4px; background: #fdecea; color: var(--danger); }
+        div.message.success { padding: 10px 12px; border-radius: 4px; background: #e8f5e9; color: #2e7d32; }
+        div.message.info    { padding: 10px 12px; border-radius: 4px; background: #ede7f6; color: var(--primary-dark); }
+        div.token-box { background: #fff8e1; border-radius: 4px; padding: 12px; margin-bottom: 16px; font-size: 13px; }
+        div.token-box code { background: #fff; padding: 1px 4px; border-radius: 3px; }
+        div.search-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        div.search-row input { flex: 1; min-width: 200px; }
+        div.search-row button { margin: 0; height: 36px; }
+        div.movie div.meta { font-size: 12px; color: #666; text-align: center; margin-top: 2px; }
+        div.movie div.overview { font-size: 12px; color: #333; margin-top: 8px; height: 64px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; }
+        div.movie.result div.title { white-space: normal; height: 42px; font-size: 15px; }
+        div.movie.result div.movie-img { cursor: default; }
+        button:disabled { opacity: .5; cursor: not-allowed; }
+        button:disabled:hover { background: white; color: var(--primary); }
+    </style>
+
+    <!-- Configuración local opcional de la API (ver config.example.js). Este archivo NO se sube a GitHub -->
+    <script src="config.js"></script>
+
+    <script type="text/javascript">
+
+       // DATA MODEL
+
+       let initial_movies = [
+        { title: "Superlópez", director: "Javier Ruiz Caldera", thumbnail: "files/superlopez.png" },
+        { title: "Jurassic Park", director: "Steven Spielberg", thumbnail: "files/jurassicpark.png" },
+        { title: "Interstellar", director: "Christopher Nolan", thumbnail: "files/interstellar.png" }
+    ];
+
+
+        localStorage.my_movies = localStorage.my_movies || JSON.stringify(initial_movies);
+
+
+        // TMDb API (part 2)
+        // The token is NOT written in this file: it is read from config.js (not uploaded to GitHub)
+        // or, if there is none, from the token the user pastes in the search view (saved in this browser).
+        const TMDB_API = 'https://api.themoviedb.org/3';
+        const TMDB_IMG = 'https://image.tmdb.org/t/p/w300';
+        const getToken = () => (window.TMDB_CONFIG && window.TMDB_CONFIG.token) || localStorage.tmdb_token || "";
+
+        // State of the last search (needed to add a result to the local database)
+        let lastQuery = "";
+        let lastResults = [];
+        let searchCounter = 0;   // ignores answers of old searches
+
+
+        // VIEWS
+        // Escapa el texto del usuario para que no rompa el HTML (comillas, <, >, &)
+        const esc = (t) => String(t === undefined || t === null ? "" : t)
+            .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+
+        const indexView = (movies) => {
+            let i=0;
+            let view = `<div class="toolbar">
+                            <button class="new">Add</button>
+                            <button class="search-view">Search TMDb</button>
+                            <button class="reset">Reset</button>
+                            <span class="count">${movies.length} movie(s)</span>
+                        </div>`;
+
+            if (movies.length === 0) {
+                view += `<div class="empty">There are no movies. Press <b>Add</b> to create one or <b>Reset</b> to restore the original list.</div>`;
+            }
+
+            view += `<div class="movies">`;
+            while(i < movies.length) {
+              view += `
+                <div class="movie">
+                   <div class="movie-img">
+                        <img class="show" data-my-id="${i}" src="${esc(movies[i].thumbnail)}" title="View details" onerror="this.src='files/noimage.png'"/>
+                   </div>
+                   <div class="title">
+                       ${esc(movies[i].title) || "<em>No title</em>"}
+                   </div>
+                   <div class="actions">
+                       <button class="show" data-my-id="${i}">view</button>
+                       <button class="edit" data-my-id="${i}">edit</button>
+                       <button class="delete" data-my-id="${i}">delete</button>
+                    </div>
+                </div>\n`;
+              i = i + 1;
+            };
+            view += `</div>`;
+
+            return view;
+        };
+
+
+        const editView = (i, movie) => {
+            return `<h2>Edit Movie</h2>
+                <div class="card">
+                <p class="hint">Change the data of the movie and press <b>Update</b> to save it, or <b>Back</b> to cancel.</p>
+                <div class="form-row">
+                <div class="field">Title</div>
+                <input  type="text" id="title" placeholder="Title"
+                        value="${esc(movie.title)}">
+                </div>
+                <div class="form-row">
+                <div class="field">Director</div>
+                <input  type="text" id="director" placeholder="Director"
+                        value="${esc(movie.director)}">
+                </div>
+                <div class="form-row">
+                <div class="field">Thumbnail</div>
+                <input  type="text" id="thumbnail" placeholder="Thumbnail URL"
+                        value="${esc(movie.thumbnail)}">
+                </div>
+                <div class="actions">
+                    <button class="update" data-my-id="${i}">
+                        Update
+                    </button>
+                    <button class="index">
+                        Back
+                    </button>
+                </div>
+                </div>
+               `;
+        }
+
+
+        const showView = (movie) => {
+            return `<h2>${esc(movie.title) || "<em>No title</em>"}</h2>
+             <div class="card detail">
+                <img src="${esc(movie.thumbnail)}" onerror="this.src='files/noimage.png'"/>
+                <div class="info">
+                    <p>
+                        <div class="field">Title</div>
+                        ${esc(movie.title) || "<em>No title</em>"}
+                    </p>
+                    <p>
+                        <div class="field">Director</div>
+                        ${esc(movie.director) || "<em>No director</em>"}
+                    </p>
+                    <div class="actions">
+                        <button class="index">Back</button>
+                    </div>
+                </div>
+             </div>`;
+        }
+
+
+        const newView = () => {
+            return `<h2>Create Movie</h2>
+                <div class="card">
+                <p class="hint">Fill in the data of the new movie. The title is required. If you leave the thumbnail empty a default image is used.</p>
+                <div class="form-row">
+                <div class="field">Title</div>
+                <input  type="text" id="titulo" placeholder="Title">
+                </div>
+                <div class="form-row">
+                <div class="field">Director</div>
+                <input  type="text" id="director" placeholder="Director">
+                </div>
+                <div class="form-row">
+                <div class="field">Thumbnail</div>
+                <input  type="text" id="miniatura" placeholder="Thumbnail URL (e.g. files/noimage.png)">
+                </div>
+                <div class="actions">
+                    <button class="create">Create</button>
+                    <button class="index">Back</button>
+                </div>
+                </div>`;
+        }
+
+
+
+        // Part 2 views
+        const formatDate = (d) => d ? d.split("-").reverse().join("/") : "No release date";
+
+        const searchView = (query = "", message = null) => {
+            const tokenBox = getToken() ? "" : `
+                <div class="token-box">
+                    <b>API key needed.</b> Paste your TMDb <i>API Read Access Token</i> (the long one that starts with <code>eyJ</code>).
+                    It is saved only in this browser (localStorage), never in the code.
+                    <div class="search-row" style="margin-top:8px">
+                        <input type="password" id="token" placeholder="TMDb API Read Access Token">
+                        <button class="save-token">Save key</button>
+                    </div>
+                </div>`;
+            const changeKey = (!tokenBox && localStorage.tmdb_token)
+                ? `<button class="clear-token">Change API key</button>` : "";
+
+            return `<h2>Search movies in TMDb</h2>
+                <div class="card">
+                    <p class="hint">Type the title of a movie and press <b>Search</b> (or Enter). Then add the ones you like to your list.</p>
+                    ${tokenBox}
+                    <div class="search-row">
+                        <input type="text" id="query" placeholder="e.g. Interstellar" value="${esc(query)}">
+                        <button class="search">Search</button>
+                    </div>
+                    <div id="message" class="message ${message ? message.type : ""}">${message ? esc(message.text) : ""}</div>
+                    <div class="actions">
+                        <button class="index">Back</button>
+                        ${changeKey}
+                    </div>
+                </div>`;
+        };
+
+
+        const resultsView = (results) => {
+            let view = `<h2>Results for “${esc(lastQuery)}”</h2>
+                <div class="search-row" style="margin-bottom:14px">
+                    <input type="text" id="query" placeholder="Search another movie" value="${esc(lastQuery)}">
+                    <button class="search">Search</button>
+                    <button class="index">Back</button>
+                </div>
+                <div id="message" class="message"></div>`;
+
+            if (results.length === 0) {
+                return view + `<div class="empty">No movies found for “${esc(lastQuery)}”.<br>Check the spelling or try another title.</div>`;
+            }
+
+            view += `<div class="movies" style="margin-top:14px">`;
+            for (const m of results) {
+                const poster = m.poster_path ? TMDB_IMG + m.poster_path : "files/noimage.png";
+                view += `
+                <div class="movie result">
+                    <div class="movie-img">
+                        <img src="${esc(poster)}" onerror="this.src='files/noimage.png'"/>
+                    </div>
+                    <div class="title" title="${esc(m.title)}">${esc(m.title)}</div>
+                    <div class="meta">${formatDate(m.release_date)}${m.vote_average ? " · ★ " + m.vote_average.toFixed(1) : ""}</div>
+                    <div class="overview">${esc(m.overview) || "<em>No synopsis available.</em>"}</div>
+                    <div class="actions">
+                        <button class="add-from-api" data-my-id="${m.id}">Add</button>
+                    </div>
+                </div>\n`;
+            }
+            view += `</div>`;
+            return view;
+        };
+
+
+
+        // CONTROLLERS 
+        const indexContr = () => {
+         searchCounter++;   // cancels any search still in progress
+         let my_movies = JSON.parse(localStorage.my_movies);
+         document.getElementById('main').innerHTML = indexView(my_movies);
+         };
+
+
+        const showContr = (i) => {
+            let movie = JSON.parse(localStorage.my_movies)[i];
+            document.getElementById('main').innerHTML = showView(movie);
+
+        };
+
+        const newContr = () => {
+            document.getElementById('main').innerHTML = newView();
+
+        };
+
+        const createContr = () => {
+            let title     = document.getElementById('titulo').value.trim();
+            let director  = document.getElementById('director').value.trim();
+            let thumbnail = document.getElementById('miniatura').value.trim();
+
+            if (title === "") {
+                alert("The title cannot be empty.");
+                return;
+            }
+
+            let my_movies = JSON.parse(localStorage.my_movies);
+            my_movies.push({
+                title:     title,
+                director:  director,
+                thumbnail: thumbnail || "files/noimage.png"
+            });
+            localStorage.my_movies = JSON.stringify(my_movies);
+            indexContr();
+        };
+
+        const editContr = (i) => {
+            let movie = JSON.parse(localStorage.my_movies)[i];
+            document.getElementById('main').innerHTML = editView(i, movie);
+        };
+
+
+        const updateContr = (i) => {
+            let my_movies = JSON.parse(localStorage.my_movies);
+            my_movies[i].title    = document.getElementById('title').value;
+            my_movies[i].director  = document.getElementById('director').value;
+            my_movies[i].thumbnail = document.getElementById('thumbnail').value;
+            localStorage.my_movies = JSON.stringify(my_movies);
+            indexContr();
+        };
+
+
+        const deleteContr = (i) => {
+            if (confirm("Are you sure you want to delete this movie?")) {
+                let my_movies = JSON.parse(localStorage.my_movies);
+                my_movies.splice(i, 1);
+                localStorage.my_movies = JSON.stringify(my_movies);
+                indexContr();
+            }
+        };
+
+
+        const resetContr = () => {
+            localStorage.my_movies = JSON.stringify(initial_movies);
+            // Compatibilidad con tests/checks.js, que lee la clave antigua "mis_peliculas"
+            localStorage.mis_peliculas = localStorage.my_movies;
+            indexContr();
+        };
+
+
+        // Part 2 controllers
+        const showMessage = (type, text) => {
+            const el = document.getElementById('message');
+            if (el) { el.className = "message " + type; el.textContent = text; }
+        };
+
+        // GET request to TMDb with the token in the Authorization header. Throws Error with a clear message.
+        const tmdbFetch = async (path) => {
+            let response;
+            try {
+                response = await fetch(TMDB_API + path, {
+                    method: 'GET',
+                    headers: { accept: 'application/json', Authorization: 'Bearer ' + getToken() }
+                });
+            } catch (e) {
+                throw new Error("Could not connect to TMDb. Check your Internet connection and try again.");
+            }
+            if (response.status === 401) throw new Error("The API key is not valid. Check your TMDb token.");
+            if (!response.ok)            throw new Error("TMDb returned an error (" + response.status + "). Try again later.");
+            return response.json();
+        };
+
+        const searchFormContr = () => {
+            searchCounter++;
+            document.getElementById('main').innerHTML = searchView();
+        };
+
+        const saveTokenContr = () => {
+            const token = document.getElementById('token').value.trim();
+            const query = document.getElementById('query').value;
+            if (token === "") {
+                showMessage("error", "Paste your TMDb token first.");
+                return;
+            }
+            localStorage.tmdb_token = token;
+            document.getElementById('main').innerHTML = searchView(query, { type: "success", text: "API key saved in this browser." });
+        };
+
+        const clearTokenContr = () => {
+            delete localStorage.tmdb_token;
+            document.getElementById('main').innerHTML = searchView();
+        };
+
+        const VALID_QUERY = /^[\p{L}\p{N}\s'’:.,!?&()\-]+$/u;
+
+        const searchContr = async (query) => {
+            const main = document.getElementById('main');
+            query = (query || "").trim();
+
+            if (query === "") {
+                main.innerHTML = searchView(query, { type: "error", text: "Type the title of a movie to search." });
+                return;
+            }
+            if (!VALID_QUERY.test(query)) {
+                main.innerHTML = searchView(query, { type: "error", text: "The search contains invalid characters. Use only letters, numbers and basic punctuation." });
+                return;
+            }
+            if (!getToken()) {
+                main.innerHTML = searchView(query, { type: "error", text: "There is no API key. Paste your TMDb token in the box above." });
+                return;
+            }
+
+            const id = ++searchCounter;
+            showMessage("info", "Searching...");
+            try {
+                const data = await tmdbFetch('/search/movie?language=es-ES&include_adult=false&query=' + encodeURIComponent(query));
+                if (id !== searchCounter) return;   // the user went elsewhere or searched again
+                lastQuery = query;
+                lastResults = Array.isArray(data.results) ? data.results : [];
+                main.innerHTML = resultsView(lastResults);
+            } catch (err) {
+                if (id !== searchCounter) return;
+                main.innerHTML = searchView(query, { type: "error", text: err.message });
+            }
+        };
+
+        const isDuplicate = (movies, movie) => movies.some(m =>
+            (movie.poster_path && m.thumbnail === movie.thumbnail) ||
+            ((m.title || "").toLowerCase() === movie.title.toLowerCase() &&
+             (m.director || "").toLowerCase() === movie.director.toLowerCase()));
+
+        const addFromAPIContr = async (movie) => {
+            if (!movie) return;
+            const btn = document.querySelector(`.add-from-api[data-my-id="${movie.id}"]`);
+            if (btn) { btn.disabled = true; btn.textContent = "Adding..."; }   // avoids double clicks
+
+            try {
+                if (!movie.title) throw new Error("This movie has no title and cannot be added.");
+
+                const newMovie = {
+                    title: movie.title,
+                    director: "",
+                    thumbnail: movie.poster_path ? TMDB_IMG + movie.poster_path : "files/noimage.png",
+                    poster_path: movie.poster_path
+                };
+
+                // already in the database? (checked before asking for the director)
+                if (isDuplicate(JSON.parse(localStorage.my_movies), { ...newMovie, director: "\u0000" })) {
+                    showMessage("error", `“${movie.title}” is already in your movies.`);
+                    if (btn) btn.textContent = "Already added";
+                    return;
+                }
+
+                // the search result has no director: it is in the credits of the movie
+                try {
+                    const credits = await tmdbFetch(`/movie/${movie.id}/credits`);
+                    newMovie.director = (credits.crew || []).filter(c => c.job === "Director").map(c => c.name).join(", ");
+                } catch (e) { /* if the credits fail the movie is added without director */ }
+
+                const my_movies = JSON.parse(localStorage.my_movies);
+                if (isDuplicate(my_movies, newMovie)) {
+                    showMessage("error", `“${movie.title}” is already in your movies.`);
+                    if (btn) btn.textContent = "Already added";
+                    return;
+                }
+
+                // same structure as the movies created by hand
+                my_movies.push({ title: newMovie.title, director: newMovie.director, thumbnail: newMovie.thumbnail });
+                localStorage.my_movies = JSON.stringify(my_movies);
+                showMessage("success", `“${movie.title}” has been added to your movies.`);
+                if (btn) btn.textContent = "Added ✓";
+            } catch (err) {
+                showMessage("error", err.message);
+                if (btn) { btn.disabled = false; btn.textContent = "Add"; }
+            }
+        };
+
+
+        // EVENT ROUTER
+        const matchEvent = (ev, sel) => ev.target.matches(sel);
+        const myId = (ev) => Number(ev.target.dataset.myId);
+
+        document.addEventListener('click', ev => {
+            if      (matchEvent(ev, '.index'))  indexContr  ();
+            else if (matchEvent(ev, '.edit'))   editContr   (myId(ev));
+            else if (matchEvent(ev, '.update')) updateContr (myId(ev));
+            else if (matchEvent(ev, '.show'))   showContr   (myId(ev));
+            else if (matchEvent(ev, '.new'))    newContr    ();
+            else if (matchEvent(ev, '.create')) createContr ();
+            else if (matchEvent(ev, '.delete')) deleteContr (myId(ev));
+            else if (matchEvent(ev, '.reset'))  resetContr  ();
+            else if (matchEvent(ev, '.search-view'))   searchFormContr ();
+            else if (matchEvent(ev, '.search'))        searchContr (document.getElementById('query').value);
+            else if (matchEvent(ev, '.add-from-api'))  addFromAPIContr (lastResults.find(m => m.id === myId(ev)));
+            else if (matchEvent(ev, '.save-token'))    saveTokenContr ();
+            else if (matchEvent(ev, '.clear-token'))   clearTokenContr ();
+        })
+
+        // Enter key in the search field (or in the token field)
+        document.addEventListener('keydown', ev => {
+            if (ev.key !== 'Enter') return;
+            if      (matchEvent(ev, '#query')) searchContr(ev.target.value);
+            else if (matchEvent(ev, '#token')) saveTokenContr();
+        })
+
+        
+        
+        // Initialization        
+        document.addEventListener('DOMContentLoaded', indexContr);
+    </script>
+</head>
+
+<body>
+
+    <h1 class="index" title="Back to the main page">My Favourite Movies</h1>
+    <div id="main"> <!-- The view is included here --> </div>
+
+    
+</body>
+</html>
